@@ -709,5 +709,5 @@ with aba5:
         if not apostas:
             st.warning(
                 "❌ Nenhum jogo com os filtros atuais. "
-                "Desative filtros extras ou aumente a tolerância."
+                "Desative filtros extras ou aumente a tolerância.")
            
