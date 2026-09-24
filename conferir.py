@@ -85,7 +85,13 @@ if st.button("🔍 Conferir", type="primary"):
         if not linha:
             continue
         # aceita vírgula, ponto, espaço, tab
-        nums_str = linha.replace(",", " ").replace(".", " ").replace("\t", " ").split()
+        nums_str = (
+    linha.replace(",", " ")
+         .replace(".", " ")
+         .replace("-", " ")
+         .replace("\t", " ")
+         .split()
+)
         try:
             jogo = sorted(int(x) for x in nums_str)
             if len(jogo) < 2:
