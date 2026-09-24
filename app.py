@@ -495,35 +495,65 @@ def gerar_massa(scores, cfg, ultimo, dist_stats, n_total,
                 finais_fortes=None, usar_finais=False,
                 diag_stats=None, usar_diag=False,
                 max_tentativas=None):
+
     if max_tentativas is None:
         max_tentativas = n_total * 100
 
-    apostas, vistos = [], set()
-    tentativas = 0
-    falhas = 0
+    def _tentar(usar_dist, usar_pop, tolerancia, usar_cooc, usar_finais, usar_diag, max_t):
+        apostas, vistos = [], set()
+        tentativas, falhas = 0, 0
+        while len(apostas) < n_total and tentativas < max_t:
+            tentativas += 1
+            a = gerar_aposta(scores, cfg, ultimo, dist_stats, tent=400,
+                             usar_dist=usar_dist, usar_pop=usar_pop,
+                             tolerancia=tolerancia,
+                             pares_fortes=pares_fortes, usar_cooc=usar_cooc,
+                             finais_fortes=finais_fortes, usar_finais=usar_finais,
+                             diag_stats=diag_stats, usar_diag=usar_diag)
+            if a and tuple(a) not in vistos:
+                apostas.append(a); vistos.add(tuple(a)); falhas = 0
+            else:
+                falhas += 1
+                if falhas > 2000:
+                    break
+        return apostas
+
+    # Tentativa 1: com todos os filtros escolhidos
     barra = st.progress(0, text=f"Gerando 0/{n_total}...")
-
-    while len(apostas) < n_total and tentativas < max_tentativas:
-        tentativas += 1
-        a = gerar_aposta(scores, cfg, ultimo, dist_stats, tent=400,
-                         usar_dist=usar_dist, usar_pop=usar_pop,
-                         tolerancia=tolerancia,
-                         pares_fortes=pares_fortes, usar_cooc=usar_cooc,
-                         finais_fortes=finais_fortes, usar_finais=usar_finais,
-                         diag_stats=diag_stats, usar_diag=usar_diag)
-        if a and tuple(a) not in vistos:
-            apostas.append(a); vistos.add(tuple(a)); falhas = 0
-            if len(apostas) % 10 == 0 or len(apostas) == n_total:
-                barra.progress(len(apostas) / n_total,
-                               text=f"Gerando {len(apostas)}/{n_total}...")
-        else:
-            falhas += 1
-            if falhas > 1000:
-                break
-
+    apostas = _tentar(usar_dist, usar_pop, tolerancia, usar_cooc, usar_finais, usar_diag, max_tentativas)
     barra.empty()
+
+    aviso = None
+
+    # Se não conseguiu o suficiente, relaxa os filtros extras
+    if len(apostas) < n_total:
+        faltam = n_total - len(apostas)
+        aviso = f"⚠️ Filtros muito restritivos. Consegui {len(apostas)} de {n_total}. "
+        st.warning(aviso + "Relaxando filtros extras (finais, diagonais) para completar...")
+
+        extras = _tentar(usar_dist, usar_pop, tolerancia, usar_cooc, False, False, faltam * 100)
+        vistos = {tuple(a) for a in apostas}
+        for a in extras:
+            if tuple(a) not in vistos:
+                apostas.append(a); vistos.add(tuple(a))
+                if len(apostas) >= n_total:
+                    break
+
+    # Se ainda faltam, relaxa TUDO
+    if len(apostas) < n_total:
+        faltam = n_total - len(apostas)
+        st.warning(f"⚠️ Ainda faltavam {faltam}. Gerando sem filtros extras...")
+
+        extras = _tentar(False, False, 2, False, False, False, faltam * 100)
+        vistos = {tuple(a) for a in apostas}
+        for a in extras:
+            if tuple(a) not in vistos:
+                apostas.append(a); vistos.add(tuple(a))
+                if len(apostas) >= n_total:
+                    break
+
     return apostas, {"solicitados": n_total, "gerados": len(apostas),
-                     "tentativas": tentativas}
+                     "tentativas": max_tentativas, "aviso": aviso}
 
 
 # =============================================================
